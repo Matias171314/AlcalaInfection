@@ -5,6 +5,7 @@
 package user.apocalipsiszombi2025;
 
 import java.util.Random;
+import user.apocalipsiszombi2025.gui.UIManager;
 import user.apocalipsiszombi2025.util.Config;
 import user.apocalipsiszombi2025.util.LoggerApocalipsis;
 import user.apocalipsiszombi2025.gui.VentanaSimulacion;
@@ -55,6 +56,7 @@ public class Zombi extends Thread {
             Exterior zona = zonasInseguras[index];
 
             LoggerApocalipsis.registrar("El zombi " + zombiID + " patrulla la zona " + zona.getID());
+            UIManager.getVentanaSimulacion().moverLabelZombi(zombiID, UIManager.getVentanaSimulacion().getPanelZonaInsegura(index));
 
             Humano objetivo = zona.elegirHumano();
             if (objetivo != null && objetivo.estaVivo()) {

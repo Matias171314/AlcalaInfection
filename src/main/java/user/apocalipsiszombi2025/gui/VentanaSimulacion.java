@@ -78,98 +78,98 @@ public class VentanaSimulacion extends javax.swing.JFrame {
         getContentPane().setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
 
         panelTuneles.setBackground(new java.awt.Color(153, 102, 0));
-        panelTuneles.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelTuneles.setLayout(new java.awt.GridLayout());
 
         jLabelTunel.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/TunelVista.png"))); // NOI18N
         jLabelTunel.setVerticalTextPosition(javax.swing.SwingConstants.TOP);
-        panelTuneles.add(jLabelTunel, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 210, 110));
+        panelTuneles.add(jLabelTunel);
 
         getContentPane().add(panelTuneles, new org.netbeans.lib.awtextra.AbsoluteConstraints(410, 40, 210, 110));
 
         panelTuneles1.setBackground(new java.awt.Color(153, 102, 0));
-        panelTuneles1.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelTuneles1.setLayout(new java.awt.GridLayout());
 
         jLabelTunel1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/TunelVista.png"))); // NOI18N
-        panelTuneles1.add(jLabelTunel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 210, 110));
+        panelTuneles1.add(jLabelTunel1);
 
         getContentPane().add(panelTuneles1, new org.netbeans.lib.awtextra.AbsoluteConstraints(410, 160, 210, 110));
 
         panelTuneles2.setBackground(new java.awt.Color(153, 102, 0));
-        panelTuneles2.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelTuneles2.setLayout(new java.awt.GridLayout());
 
         jLabelTunel2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/TunelVista.png"))); // NOI18N
-        panelTuneles2.add(jLabelTunel2, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 210, 110));
+        panelTuneles2.add(jLabelTunel2);
 
         getContentPane().add(panelTuneles2, new org.netbeans.lib.awtextra.AbsoluteConstraints(410, 400, 210, 110));
 
         panelTuneles3.setBackground(new java.awt.Color(153, 102, 0));
-        panelTuneles3.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelTuneles3.setLayout(new java.awt.GridLayout());
 
         jLabelTunel3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/TunelVista.png"))); // NOI18N
-        panelTuneles3.add(jLabelTunel3, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 210, 110));
+        panelTuneles3.add(jLabelTunel3);
 
         getContentPane().add(panelTuneles3, new org.netbeans.lib.awtextra.AbsoluteConstraints(410, 280, 210, 110));
 
         panelZonasInseguras.setBackground(new java.awt.Color(153, 0, 153));
         panelZonasInseguras.setPreferredSize(new java.awt.Dimension(378, 0));
-        panelZonasInseguras.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelZonasInseguras.setLayout(new java.awt.GridLayout());
 
         jLabelExterior.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/ExteriorVista.png"))); // NOI18N
-        panelZonasInseguras.add(jLabelExterior, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+        panelZonasInseguras.add(jLabelExterior);
 
         getContentPane().add(panelZonasInseguras, new org.netbeans.lib.awtextra.AbsoluteConstraints(630, 160, 360, 110));
 
         panelZonasInseguras1.setBackground(new java.awt.Color(153, 0, 153));
         panelZonasInseguras1.setPreferredSize(new java.awt.Dimension(378, 0));
-        panelZonasInseguras1.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelZonasInseguras1.setLayout(new java.awt.GridLayout());
 
         jLabelExterior1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/ExteriorVista.png"))); // NOI18N
-        panelZonasInseguras1.add(jLabelExterior1, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+        panelZonasInseguras1.add(jLabelExterior1);
 
         getContentPane().add(panelZonasInseguras1, new org.netbeans.lib.awtextra.AbsoluteConstraints(630, 400, 360, 110));
 
         panelZonasInseguras2.setBackground(new java.awt.Color(153, 0, 153));
         panelZonasInseguras2.setPreferredSize(new java.awt.Dimension(378, 0));
-        panelZonasInseguras2.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelZonasInseguras2.setLayout(new java.awt.GridLayout());
 
         jLabelExterior2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/ExteriorVista.png"))); // NOI18N
-        panelZonasInseguras2.add(jLabelExterior2, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 360, 110));
+        panelZonasInseguras2.add(jLabelExterior2);
 
         getContentPane().add(panelZonasInseguras2, new org.netbeans.lib.awtextra.AbsoluteConstraints(630, 40, 360, 110));
 
         panelZonasInseguras3.setBackground(new java.awt.Color(153, 0, 153));
         panelZonasInseguras3.setPreferredSize(new java.awt.Dimension(378, 0));
-        panelZonasInseguras3.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelZonasInseguras3.setLayout(new java.awt.GridLayout());
 
         jLabelExterior3.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/ExteriorVista.png"))); // NOI18N
-        panelZonasInseguras3.add(jLabelExterior3, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+        panelZonasInseguras3.add(jLabelExterior3);
 
         getContentPane().add(panelZonasInseguras3, new org.netbeans.lib.awtextra.AbsoluteConstraints(630, 280, 360, 110));
 
         panelZonaComun.setBackground(new java.awt.Color(0, 153, 153));
         panelZonaComun.setPreferredSize(new java.awt.Dimension(400, 0));
-        panelZonaComun.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelZonaComun.setLayout(new java.awt.GridLayout());
 
         jLabelZonaComun.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/AreaComunVista.png"))); // NOI18N
-        panelZonaComun.add(jLabelZonaComun, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 390, 150));
+        panelZonaComun.add(jLabelZonaComun);
 
         getContentPane().add(panelZonaComun, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 40, 390, 150));
 
         panelComedor.setBackground(new java.awt.Color(0, 153, 153));
         panelComedor.setPreferredSize(new java.awt.Dimension(400, 0));
-        panelComedor.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelComedor.setLayout(new java.awt.GridLayout());
 
         jLabelComedor.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/AreaDescansoVista.png"))); // NOI18N
-        panelComedor.add(jLabelComedor, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+        panelComedor.add(jLabelComedor);
 
         getContentPane().add(panelComedor, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 360, 390, 150));
 
         panelDescanso.setBackground(new java.awt.Color(0, 153, 153));
         panelDescanso.setPreferredSize(new java.awt.Dimension(400, 0));
-        panelDescanso.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
+        panelDescanso.setLayout(new java.awt.GridLayout());
 
         jLabelDescanso.setIcon(new javax.swing.ImageIcon(getClass().getResource("/resources/AreaComedorVista.png"))); // NOI18N
-        panelDescanso.add(jLabelDescanso, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
+        panelDescanso.add(jLabelDescanso);
 
         getContentPane().add(panelDescanso, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 200, 390, 150));
 
@@ -272,6 +272,19 @@ public class VentanaSimulacion extends javax.swing.JFrame {
             getPanelZonaInsegura(0).add(label); // por defecto zona 0
             getPanelZonaInsegura(0).revalidate();
             getPanelZonaInsegura(0).repaint();
+        });
+    }
+    
+    public void moverLabelZombi(String id, JPanel destino) {
+        JLabel label = zombiLabels.get(id);
+        if (label == null) return;
+
+        removerDeTodosLosPaneles(label);
+
+        SwingUtilities.invokeLater(() -> {
+            destino.add(label);
+            destino.revalidate();
+            destino.repaint();
         });
     }
 
