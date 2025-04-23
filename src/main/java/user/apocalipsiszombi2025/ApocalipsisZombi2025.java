@@ -14,7 +14,7 @@ import user.apocalipsiszombi2025.util.Config;
 public class ApocalipsisZombi2025 {
     private static final Random rand = new Random();
     
-    public static void main(String[] args) {
+    public static void iniciarSimulacion() {
         Refugio refugio = new Refugio();
         
         Tunel[] tuneles = new Tunel[Config.NUM_TUNELES];

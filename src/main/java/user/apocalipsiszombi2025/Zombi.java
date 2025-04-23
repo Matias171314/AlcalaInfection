@@ -7,6 +7,7 @@ package user.apocalipsiszombi2025;
 import java.util.Random;
 import user.apocalipsiszombi2025.util.Config;
 import user.apocalipsiszombi2025.util.LoggerApocalipsis;
+import user.apocalipsiszombi2025.gui.VentanaSimulacion;
 
 /**
  *
@@ -17,10 +18,18 @@ public class Zombi extends Thread {
     private final Exterior[] zonasInseguras;
     private int muertes = 0;
     private Random rand = new Random();
+    private static VentanaSimulacion gui;
     
     public Zombi (String zombiID, Exterior[] zonasInseguras) {
         this.zombiID = zombiID;
         this.zonasInseguras = zonasInseguras;
+        if (gui != null) {
+            gui.crearLabelZombi(zombiID);
+        }
+    }
+    
+    public static void setGUI(VentanaSimulacion guiRef) {
+        gui = guiRef;
     }
     
     @Override
@@ -31,6 +40,10 @@ public class Zombi extends Thread {
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
+        } finally {
+            if (gui != null) {
+                gui.eliminarLabelZombi(zombiID);
+            }
         }
     }
     

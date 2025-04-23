@@ -8,6 +8,7 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import user.apocalipsiszombi2025.gui.UIManager;
 
 /**
  *
@@ -19,12 +20,27 @@ public class LoggerApocalipsis {
 
     public static void registrar(String mensaje) {
         synchronized (lock) {
+            String fechaHora = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String logFinal = "[" + fechaHora + "] " + mensaje;
+
+            // Mostrar en consola
+            System.out.println(logFinal);
+
+            // Guardar en archivo
             try (PrintWriter out = new PrintWriter(new FileWriter(FILE_NAME, true))) {
-                String fechaHora = LocalDateTime.now()
-                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                out.println("[" + fechaHora + "] " + mensaje);
+                out.println(logFinal);
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+
+            // Mostrar en la interfaz gráfica si está cargada
+            if (UIManager.getVentanaSimulacion() != null) {
+                javax.swing.SwingUtilities.invokeLater(() -> {
+                    var area = UIManager.getVentanaSimulacion().getTextAreaLog();
+                    area.append(logFinal + "\n");
+                    area.setCaretPosition(area.getDocument().getLength());
+                });
             }
         }
     }
