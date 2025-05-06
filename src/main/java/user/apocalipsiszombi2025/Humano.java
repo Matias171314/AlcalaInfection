@@ -4,141 +4,165 @@
  */
 package user.apocalipsiszombi2025;
 
-import user.apocalipsiszombi2025.util.LoggerApocalipsis;
-import user.apocalipsiszombi2025.util.Config;
-import user.apocalipsiszombi2025.gui.UIManager;
-import java.util.Random;
-import user.apocalipsiszombi2025.gui.VentanaSimulacion;
+import user.apocalipsiszombi2025.util.*;
+import user.apocalipsiszombi2025.gui.*;
 
+import java.util.Random;
 /**
  *
  * @author matin
  */
 public class Humano extends Thread {
-    private final String humanoID;
+    private final String idHumano;
+    private final Object lock = new Object();
+    private volatile boolean vivo = true;
+    private volatile boolean herido = false;
+    private volatile boolean marcadoPorZombi = false;
+    private volatile boolean siendoAtacado = false;
+
+    private int zonaActualID = -1;
     private final Tunel[] tuneles;
     private final Refugio refugio;
-    private final Exterior[] zonasInseguras;
-    private boolean herido = false;
-    private boolean vivo = true;
-    private Random rand = new Random();
-    private static VentanaSimulacion gui;
-    
-    public Humano(String humanoID, Tunel[] tuneles, Refugio refugio, Exterior[] zonasInseguras) {
-        this.humanoID = humanoID;
+    private final Exterior[] zonas;
+    private final Random random = new Random();
+    private final InterfazManager interfazManager;
+
+    public Humano(String idHumano, Tunel[] tuneles, Refugio refugio, Exterior[] zonas, InterfazManager interfazManager) {
+        this.idHumano = idHumano;
         this.tuneles = tuneles;
         this.refugio = refugio;
-        this.zonasInseguras = zonasInseguras;
-        
-        var gui = UIManager.getVentanaSimulacion();
-        if (gui != null) {
-            gui.crearLabelHumano(humanoID);
-        }
+        this.zonas = zonas;
+        this.interfazManager = interfazManager;
+        interfazManager.registrarHumano(idHumano);
+        LoggerApocalipsis.registroHumano(idHumano, "Ha llegado al refugio");
     }
-    
-    public static void setGUI(VentanaSimulacion guiRef) {
-        gui = guiRef;
-    }
-    
-    private void zonaComun() throws InterruptedException {
-        LoggerApocalipsis.registrar("El humano " + humanoID + " entra a la ZONA COMUN.");
-        UIManager.getVentanaSimulacion().moverLabelHumano(humanoID, UIManager.getVentanaSimulacion().getPanelZonaComun());
-        Thread.sleep(rand.nextInt(Config.TIEMPO_ZONA_COMUN_MIN, Config.TIEMPO_ZONA_COMUN_MAX)); // 1 a 2 seg
-    }
-    
-    private void explorarMundo() throws InterruptedException {
-        int camino = rand.nextInt(tuneles.length);
-        
-        for (int i=0; i < tuneles.length; i++) {
-            int index = (camino + i) % tuneles.length;
-            Tunel tunelElegido = tuneles[index];
-            
-            LoggerApocalipsis.registrar("El humano " + humanoID + " quiere salir por el túnel " + camino);
-            
-            tunelElegido.esperarGrupoParaSalir(humanoID);
-            tunelElegido.salirRefugio(humanoID);
-            LoggerApocalipsis.registrar("El humano " + humanoID + " ha llegado al exterior.");
 
-            // Entra en la zona correspondiente al túnel usado
-            Exterior zona = zonasInseguras[index];
-            zona.entrarHumano(this);
-            UIManager.getVentanaSimulacion().moverLabelHumano(humanoID, UIManager.getVentanaSimulacion().getPanelZonaInsegura(index));
-            
-            Thread.sleep(rand.nextInt(Config.TIEMPO_EXPLORACION_MIN, Config.TIEMPO_EXPLORACION_MAX)); // explora
-            zona.salirHumano(this);
-
-            if (!vivo) {
-                LoggerApocalipsis.registrar("El humano " + humanoID + " ha muerto y no regresa al refugio.");
-                UIManager.getVentanaSimulacion().eliminarLabelHumano(humanoID);
-                return;
+    @Override
+    public void run() {
+        try {
+            while (estaVivo()) {
+                if (!simulacionPausada()) {
+                    cicloExploracion();
+                    cicloRefugio();
+                } else {
+                    esperarReanudacion();
+                }
             }
-            
-            LoggerApocalipsis.registrar("El humano " + humanoID + " regresa al refugio por el túnel " + camino);
-            tunelElegido.entrarRefugio(humanoID);     
-            
-            if (!herido) {
-                refugio.reponerComida(2);
-                LoggerApocalipsis.registrar("El humano " + humanoID + " trajo 2 unidades de comida al refugio.");
-            } else {
-                LoggerApocalipsis.registrar("El humano " + humanoID + " volvió herido, sin comida.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (!estaVivo()) {
+                convertirEnZombi(zonaActualID);
             }
-            
-            return; // terminó su viaje con éxito
         }
-        
-        LoggerApocalipsis.registrar("El humano " + humanoID + " no pudo salir por ningún túnel esta vez.");
     }
-    
-    private void descansarYComer() throws InterruptedException {
-        LoggerApocalipsis.registrar("El humano " + humanoID + " entra a la ZONA DE DESCANSO.");
-        UIManager.getVentanaSimulacion().moverLabelHumano(humanoID, UIManager.getVentanaSimulacion().getPanelZonaDescanso());
-        refugio.descansar(humanoID, herido);
-        UIManager.getVentanaSimulacion().moverLabelHumano(humanoID, UIManager.getVentanaSimulacion().getPanelZonaComedor());
-        refugio.comer(humanoID);
 
-        if (herido) {
-            LoggerApocalipsis.registrar("El humano " + humanoID + " está herido y vuelve a descansar.");
-            herido = false;
+    // ===== CICLO DE EXPLORACIÓN =====
+    private void cicloExploracion() throws InterruptedException {
+        refugio.entrarZonaComun(this);
+
+        Tunel tunel = seleccionarTunel();
+        Exterior zona = zonas[tunel.getID()];
+        tunel.salirEnGrupo(this);
+
+        try {
+            zona.explorar(this);
+            zonaActualID = zona.getID();
+        } finally {
+            tunel.entrarRefugio(this);
+            if (!estaHerido()) {
+                refugio.reponerComida(Config.COMIDA_RECOLECTADA);
+            }
         }
     }
+
+    // ===== CICLO EN EL REFUGIO =====
+    private void cicloRefugio() throws InterruptedException {
+        refugio.entrarZonaDescanso(this, 0);
+        refugio.entrarZonaComedor(this);
+        if (estaMarcado()) {
+            refugio.entrarZonaDescanso(this, 1);
+            setMarcado(false);
+            setHerido(false);
+        }
+    }
+
+    private void convertirEnZombi(int idZona) {
+        try {
+            String idZombi = idHumano.replace('H', 'Z');
+            Zombi nuevoZombi = new Zombi(idZombi, zonas, interfazManager, idZona);
+
+            // Primero registrar el zombi antes de eliminar al humano
+            ApocalipsisZombi2025.agregarZombi(nuevoZombi);
+
+            // Luego eliminar al humano de la interfaz
+            interfazManager.eliminarEntidad(idHumano);
+
+            // Finalmente iniciar el nuevo zombi
+            nuevoZombi.start();
+            LoggerApocalipsis.registroZombi(idZombi, "Creado desde " + idHumano);
+        } catch (Exception e) {}
+    }
+
+    // ===== MÉTODOS AUXILIARES =====
+    private Tunel seleccionarTunel() {
+        return tuneles[random.nextInt(tuneles.length)];
+    }
+
+    private boolean simulacionPausada() {
+        return ApocalipsisZombi2025.isSimulacionPausada();
+    }
+
+    private void esperarReanudacion() throws InterruptedException {
+        synchronized (ApocalipsisZombi2025.class) {
+            while (simulacionPausada()) {
+                ApocalipsisZombi2025.class.wait();
+            }
+        }
+    }
+
+    // ===== GETTERS & SETTERS SINCRONIZADOS =====
+    public String getID() {
+        return idHumano;
+    }
     
+    public Exterior[] getZonas() {
+        return zonas;
+    }
+
+    public boolean estaHerido() {
+        return herido;
+    }
+
+    public boolean estaMarcado() {
+        return marcadoPorZombi;
+    }
+
     public boolean estaVivo() {
         return vivo;
     }
     
-    public String getID() {
-        return humanoID;
-    }
-    
-    public void serHerido() {
-        herido = true;
-    }
-    
-    public void morir() {
-        vivo = false;
-        LoggerApocalipsis.registrar("El humano " + humanoID + " ha muerto.");
-        UIManager.getVentanaSimulacion().eliminarLabelHumano(humanoID);
-        // Crear zombi con mismo número
-        String idZombi = humanoID.replace('H', 'Z');
-        Zombi nuevoZombi = new Zombi(idZombi, zonasInseguras);
-        LoggerApocalipsis.registrar("El humano " + humanoID + " ha renacido como zombi " + idZombi);
-        nuevoZombi.start();
-    }
-    
-    @Override
-    public void run() {
-        try {
-            while (vivo) {
-                zonaComun();
-                explorarMundo();
-                if (!vivo) {
-                    break;
-                }
-                descansarYComer();
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+    public boolean estaSiendoAtacado() {
+        synchronized (lock) {
+            return siendoAtacado;
         }
     }
+
+    public void setSiendoAtacado(boolean siendoAtacado) {
+        synchronized (lock) {
+            this.siendoAtacado = siendoAtacado;
+        }
+    }
+    
+    public void setMarcado(boolean marcado) {
+        this.marcadoPorZombi = marcado;
+    }
+
+    public void setHerido(boolean herido) {
+        this.herido = herido;
+    }
+
+    public void setVivo(boolean vivo) {
+        this.vivo = vivo;
+    }
 }
- 

@@ -4,67 +4,102 @@
  */
 package user.apocalipsiszombi2025;
 
-import user.apocalipsiszombi2025.util.LoggerApocalipsis;
-import java.util.concurrent.Semaphore;
-import java.util.Random;
-import user.apocalipsiszombi2025.util.Config;
+import user.apocalipsiszombi2025.util.*;
+import user.apocalipsiszombi2025.gui.*;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.*;
+import java.util.concurrent.Semaphore;
 /**
  *
  * @author matin
  */
 public class Refugio {
-    private final Semaphore comedor = new Semaphore(Config.NUM_PLATOS_COMEDOR); // 5 plazas en el comedor
-    private int comidaDisponible = Config.COMIDA_INICIAL; // cantidad inicial de raciones
-    private final Object lockComida = new Object(); // para proteger acceso a la comida
-    private Random rand = new Random();
-    
-    public void zonaComun (String humanoID) throws InterruptedException {
-        LoggerApocalipsis.registrar("El humano " + humanoID + " esta en la zona comun.");
-        Thread.sleep(rand.nextInt(1000, 2000));
+    private final AtomicInteger comidaDisponible = new AtomicInteger(Config.COMIDA_INICIAL);
+    private final AtomicInteger humanosEnRefugio = new AtomicInteger(0);
+    private final Lock lockComida = new ReentrantLock(true);
+    private final Condition hayComida = lockComida.newCondition();
+    private final Semaphore comedor = new Semaphore(Config.PLAZAS_COMEDOR, true);
+    private final InterfazManager interfazManager;
+
+    public Refugio(InterfazManager interfazManager) {
+        this.interfazManager = interfazManager;
     }
-    
-    public void comer(String humanoID) throws InterruptedException {
-        LoggerApocalipsis.registrar("El humano " + humanoID + " quiere entrar al comedor");
+
+    // ===== ZONA COMÚN =====
+    public void entrarZonaComun(Humano humano) throws InterruptedException {
+        humanosEnRefugio.incrementAndGet();
+        interfazManager.moverHumanoAZonaComun(humano.getID());
+        LoggerApocalipsis.registroHumano(humano.getID(), "Entró en Zona Común");
+        esperaConPausa(Config.randTiempo(Config.TIEMPO_PREPARACION_MIN, Config.TIEMPO_PREPARACION_MAX));
+    }
+
+    // ===== ZONA DE DESCANSO =====
+    public void entrarZonaDescanso(Humano humano, int tipo) throws InterruptedException {
+        interfazManager.moverHumanoAZonaDescanso(humano.getID());
+        long tiempo = (tipo == 0) ? Config.TIEMPO_DESCANSO_NORMAL : Config.TIEMPO_DESCANSO_HERIDO;
+        LoggerApocalipsis.registroHumano(humano.getID(), tipo == 0 ? "Descanso normal" : "Descanso herido");
+        esperaConPausa(tiempo);
+        if (tipo == 1) humano.setHerido(false);
+    }
+
+    // ===== COMEDOR =====
+    public void entrarZonaComedor(Humano humano) throws InterruptedException {
         comedor.acquire();
-        LoggerApocalipsis.registrar("El humano " + humanoID + " entra al comedor");
-        
-        Thread.sleep(Config.TIEMPO_COMER);
-        
-        synchronized (lockComida) { 
-            if (comidaDisponible > 0) {
-                comidaDisponible--;
-                LoggerApocalipsis.registrar("El humano " + humanoID + " comio. Comida restante: " + comidaDisponible);
-            } else {
-                LoggerApocalipsis.registrar("El humano " + humanoID + " no enconro comida");
+        try {
+            interfazManager.moverHumanoAZonaComedor(humano.getID());
+            lockComida.lock();
+            try {
+                while (comidaDisponible.get() == 0 && humano.estaVivo()) {
+                    hayComida.await();
+                }
+                if (humano.estaVivo() && comidaDisponible.get() > 0) {
+                    comidaDisponible.decrementAndGet();
+                    interfazManager.actualizarComida(comidaDisponible.get());
+                    LoggerApocalipsis.registroHumano(humano.getID(), "Está comiendo. Queda: " + comidaDisponible.get());
+                    esperaConPausa(Config.randTiempo(Config.TIEMPO_COMER_MIN, Config.TIEMPO_COMER_MAX));
+                }
+            } finally {
+                lockComida.unlock();
             }
-        }
-        
-        Thread.sleep(Config.TIEMPO_COMER);
-        
-        comedor.release();
-        LoggerApocalipsis.registrar("El humano " + humanoID + " sale del comedor");
-    }
-    
-    public void descansar (String humanoID, boolean herido) throws InterruptedException {
-        if (herido) {
-            LoggerApocalipsis.registrar("El humano " + humanoID + " esta herido y necesita descansar mas");
-            Thread.sleep(Config.TIEMPO_DESCANSO_HERIDO);
-        } else {
-            LoggerApocalipsis.registrar("El humano " + humanoID + " descansa");
-            Thread.sleep(Config.TIEMPO_DESCANSO);
+            LoggerApocalipsis.registroHumano(humano.getID(), "Terminó de comer");
+        } finally {
+            comedor.release();
         }
     }
-    
-    public void reponerComida (int cantidad) {
-        synchronized (lockComida) {
-            comidaDisponible += cantidad;
+
+    // ===== REPOSICIÓN DE COMIDA =====
+    public void reponerComida(int cantidad) {
+        lockComida.lock();
+        try {
+            comidaDisponible.addAndGet(cantidad);
+            interfazManager.actualizarComida(comidaDisponible.get());
+            hayComida.signalAll();
+            LoggerApocalipsis.registroComida(comidaDisponible.get());
+        } finally {
+            lockComida.unlock();
         }
     }
-    
-    public int getComidaDisponible() {
-        synchronized (lockComida) {
-            return comidaDisponible;
+
+    // ===== MÉTODO AUXILIAR DE PAUSA =====
+    private void esperaConPausa(long tiempoMs) throws InterruptedException {
+        long restante = tiempoMs;
+        while (restante > 0 && !Thread.interrupted()) {
+            if (ApocalipsisZombi2025.isSimulacionPausada()) {
+                synchronized (ApocalipsisZombi2025.class) {
+                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
+                        ApocalipsisZombi2025.class.wait();
+                    }
+                }
+            }
+            long dormir = Math.min(500, restante);
+            Thread.sleep(dormir);
+            restante -= dormir;
         }
+    }
+
+    // ===== ESTADÍSTICAS =====
+    public int getHumanosEnRefugio() {
+        return humanosEnRefugio.get();
     }
 }

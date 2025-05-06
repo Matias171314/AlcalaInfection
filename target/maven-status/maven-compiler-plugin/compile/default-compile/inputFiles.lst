@@ -1,10 +1,13 @@
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\ApocalipsisZombi2025.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\Exterior.java
-C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\gui\MenuPrincipal.java
-C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\gui\UIManager.java
-C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\gui\VentanaSimulacion.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\gui\InterfazManager.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\gui\PantallaPrincipal.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\Humano.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\Refugio.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\remote\ClienteRMI.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\remote\ServicioApocalipsis.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\remote\ServicioApocalipsisImpl.java
+C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\remote\ServidorRMI.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\Tunel.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\util\Config.java
 C:\Users\matin\Documents\Trabajos GitHub\ApocalipsisZombi2025\src\main\java\user\apocalipsiszombi2025\util\LoggerApocalipsis.java

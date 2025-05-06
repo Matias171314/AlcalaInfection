@@ -1,9 +1,9 @@
-user\apocalipsiszombi2025\gui\UIManager.class
-user\apocalipsiszombi2025\gui\MenuPrincipal$1.class
-user\apocalipsiszombi2025\gui\VentanaSimulacion$2.class
-user\apocalipsiszombi2025\gui\MenuPrincipal$3.class
-user\apocalipsiszombi2025\gui\MenuPrincipal.class
+user\apocalipsiszombi2025\remote\ClienteRMI.class
+user\apocalipsiszombi2025\remote\ClienteRMI$1.class
+user\apocalipsiszombi2025\gui\InterfazManager.class
+user\apocalipsiszombi2025\remote\ServicioApocalipsis.class
 user\apocalipsiszombi2025\Exterior.class
-user\apocalipsiszombi2025\gui\MenuPrincipal$2.class
-user\apocalipsiszombi2025\gui\VentanaSimulacion$1.class
-user\apocalipsiszombi2025\gui\VentanaSimulacion.class
+user\apocalipsiszombi2025\remote\ServicioApocalipsisImpl.class
+user\apocalipsiszombi2025\gui\PantallaPrincipal$1.class
+user\apocalipsiszombi2025\remote\ServidorRMI.class
+user\apocalipsiszombi2025\gui\PantallaPrincipal.class

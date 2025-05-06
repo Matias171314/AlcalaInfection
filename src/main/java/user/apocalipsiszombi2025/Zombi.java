@@ -4,98 +4,108 @@
  */
 package user.apocalipsiszombi2025;
 
-import java.util.Random;
-import user.apocalipsiszombi2025.gui.UIManager;
-import user.apocalipsiszombi2025.util.Config;
-import user.apocalipsiszombi2025.util.LoggerApocalipsis;
-import user.apocalipsiszombi2025.gui.VentanaSimulacion;
+import user.apocalipsiszombi2025.gui.*;
+import user.apocalipsiszombi2025.util.*;
 
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 /**
  *
  * @author matin
  */
 public class Zombi extends Thread {
-    private final String zombiID;
-    private final Exterior[] zonasInseguras;
-    private int muertes = 0;
-    private Random rand = new Random();
-    private static VentanaSimulacion gui;
-    
-    public Zombi (String zombiID, Exterior[] zonasInseguras) {
-        this.zombiID = zombiID;
-        this.zonasInseguras = zonasInseguras;
-        if (gui != null) {
-            gui.crearLabelZombi(zombiID);
-        }
+    private final String idZombi;
+    private final Exterior[] zonas;
+    private final AtomicInteger muertes = new AtomicInteger(0);
+    private final Random rand = new Random();
+    private final InterfazManager interfazManager;
+    private volatile boolean activo = true;
+    private int zonaActual;
+
+    public Zombi(String idZombi, Exterior[] zonas, InterfazManager interfazManager, int zonaInicial) {
+        this.idZombi = idZombi;
+        this.zonas = zonas;
+        this.interfazManager = interfazManager;
+        this.zonaActual = zonaInicial;
+        this.setName("Zombi-" + idZombi);
     }
-    
-    public static void setGUI(VentanaSimulacion guiRef) {
-        gui = guiRef;
-    }
-    
+
     @Override
     public void run() {
         try {
-            while(true) {
-                patrullar();
+            interfazManager.registrarZombi(idZombi, zonaActual);
+            while (activo && !isInterrupted()) {
+                if (!simulacionPausada()) {
+                    patrullarZona();
+                } else {
+                    esperarReanudacion();
+                }
             }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
         } finally {
-            if (gui != null) {
-                gui.eliminarLabelZombi(zombiID);
+            LoggerApocalipsis.registroZombi(idZombi, "Dejó de patrullar");
+        }
+    }
+
+    private void patrullarZona() throws InterruptedException {
+        // El zombi permanece en su zona actual (no cambia como en el código original)
+        Exterior zona = zonas[zonaActual];
+
+        // Realizar ataque en la zona actual
+        zona.atacar(this);
+
+        // Tiempo de espera después de atacar (cooldown)
+        esperaConPausa(3000); // 3 segundos de cooldown
+    }
+
+    private void esperaConPausa(long tiempoMs) throws InterruptedException {
+        long restante = tiempoMs;
+        while (restante > 0 && !Thread.interrupted()) {
+            if (ApocalipsisZombi2025.isSimulacionPausada()) {
+                synchronized (ApocalipsisZombi2025.class) {
+                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
+                        ApocalipsisZombi2025.class.wait();
+                    }
+                }
+            }
+            long dormir = Math.min(500, restante);
+            Thread.sleep(dormir);
+            restante -= dormir;
+        }
+    }
+
+    public void incrementarMuertes() {
+            muertes.incrementAndGet();
+    }
+    
+    private boolean simulacionPausada() {
+        return ApocalipsisZombi2025.isSimulacionPausada();
+    }
+
+    private void esperarReanudacion() throws InterruptedException {
+        synchronized (ApocalipsisZombi2025.class) {
+            while (simulacionPausada()) {
+                ApocalipsisZombi2025.class.wait();
             }
         }
     }
-    
-    private void patrullar () throws InterruptedException {
-        int zonaID = rand.nextInt(zonasInseguras.length);
-        
-        for (int i = 0; i < zonasInseguras.length; i++) {
-            int index = (zonaID + i) % zonasInseguras.length; // recorrido circular
-            Exterior zona = zonasInseguras[index];
 
-            LoggerApocalipsis.registrar("El zombi " + zombiID + " patrulla la zona " + zona.getID());
-            UIManager.getVentanaSimulacion().moverLabelZombi(zombiID, UIManager.getVentanaSimulacion().getPanelZonaInsegura(index));
-
-            Humano objetivo = zona.elegirHumano();
-            if (objetivo != null && objetivo.estaVivo()) {
-                atacar(objetivo, zona);
-                return;
-        }
+    public void detener() {
+        activo = false;
+        this.interrupt();
     }
 
-    LoggerApocalipsis.registrar("El zombi " + zombiID + " no encontró humanos en ninguna zona. Espera...");
-    Thread.sleep(rand.nextInt(Config.TIEMPO_ESPERA_ZOMBI_MIN, Config.TIEMPO_ESPERA_ZOMBI_MAX));
-        
-    }
-    
-    private void atacar(Humano objetivo, Exterior zona) throws InterruptedException {
-        LoggerApocalipsis.registrar("El zombi " + zombiID + " ataca al humano " + objetivo.getID());
-
-        Thread.sleep(rand.nextInt(Config.TIEMPO_ATAQUE_MIN, Config.TIEMPO_ATAQUE_MAX));
-
-        boolean defensaExitosa = rand.nextDouble() < (2.0 / 3);
-
-        if (defensaExitosa) {
-            objetivo.serHerido();
-            LoggerApocalipsis.registrar("El humano " + objetivo.getID() + " se defendió del zombi " + zombiID);
-        } else {
-            objetivo.morir();
-            muertes++;
-            LoggerApocalipsis.registrar("El zombi " + zombiID + " mató al humano " + objetivo.getID()
-                    + " (muertes: " + muertes + ")");
-            zona.notificarMuerte(objetivo);
-        }
-
-        Thread.sleep(rand.nextInt(500, Config.TIEMPO_POST_ATAQUE)); // pausa tras el ataque
-    }
-
+    // ===== GETTERS =====
     public String getID() {
-        return zombiID;
+        return idZombi;
     }
 
     public int getMuertes() {
-        return muertes;
-    } 
+        return muertes.get();
+    }
+
+    public int getZonaActual() {
+        return zonaActual;
+    }
 }
