@@ -49,13 +49,3 @@ mvn clean package
 ```
 
 La aplicación necesita un entorno gráfico para mostrar las ventanas Swing.
-
-## Comprobaciones de regresión
-
-Con Python 3 y el JDK instalados, y después de descargar las dependencias al compilar el proyecto:
-
-```bash
-python3 tests/regression.py
-```
-
-Estas comprobaciones compilan la lógica en un directorio temporal y sustituyen la vista para ejecutarse sin pantalla. Verifican pausa y reanudación, cambios de zona, reserva de víctimas, contadores, comedor concurrente, conversión y apagado. No sustituyen la revisión visual ni la comparación del comportamiento con el enunciado de la práctica.
