@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
 public class Exterior {
     private final int idZona;
     private final List<Humano> humanos = new CopyOnWriteArrayList<>();
-    private final List<Zombi> zombis = new CopyOnWriteArrayList<>();
+    private final java.util.Set<Zombi> zombis = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Object lockHumanos = new Object();
     private final Random rand = new Random();
     private final InterfazManager interfazManager;
 
@@ -30,44 +31,42 @@ public class Exterior {
 
     // ===== MÉTODOS PRINCIPALES =====
     public void explorar(Humano humano) throws InterruptedException {
-        humanos.add(humano);
+        synchronized (lockHumanos) { humanos.add(humano); }
         interfazManager.moverHumanoAZonaExterior(humano.getID(), idZona);
         LoggerApocalipsis.registroHumano(humano.getID(), "Entró a Zona " + idZona);
 
         try {
             esperaConPausa(Config.randTiempo(Config.TIEMPO_EXPLORACION_MIN, Config.TIEMPO_EXPLORACION_MAX));
-            if (humano.estaSiendoAtacado()) {
-                    // Esperar a que termine el ataque
-                while (humano.estaSiendoAtacado() && humano.estaVivo()) {
-                    esperaConPausa(500);
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } finally {
-            if (humano.estaVivo() && humanos.contains(humano)) {
+            synchronized (lockHumanos) {
+                while (humano.estaSiendoAtacado() && humano.estaVivo()) lockHumanos.wait();
                 humanos.remove(humano);
+            }
+        } finally {
+            synchronized (lockHumanos) { humanos.remove(humano); }
+            if (humano.estaVivo()) {
                 interfazManager.moverHumanoASalida(humano.getID(), idZona);
                 LoggerApocalipsis.registroHumano(humano.getID(), "Salió de Zona " + idZona);
             }
         }
     }
-    
+
     // ===== MÉTODOS PARA ZOMBIS =====
 
-    public void atacar(Zombi zombi) throws InterruptedException {
-        zombis.add(zombi);
-        interfazManager.moverZombiAZonaExterior(zombi.getID(), idZona);
-        LoggerApocalipsis.registroZombi(zombi.getID(), "Entró a Zona " + idZona);
-        Humano humano = buscarHumanoDisponible();
-        if (humano == null) return;
+    public boolean atacar(Zombi zombi) throws InterruptedException {
+        registrarZombi(zombi);
+        Humano humano;
+        synchronized (lockHumanos) {
+            humano = buscarHumanoDisponible();
+            if (humano != null) humano.setSiendoAtacado(true);
+        }
+        if (humano == null) return false;
 
         try {
-            humano.setSiendoAtacado(true);
             boolean ataqueExitoso = rand.nextDouble() >= Config.PROBABILIDAD_DEFENSA;
 
             esperaConPausa(Config.randTiempo(Config.TIEMPO_ATAQUE_MIN, Config.TIEMPO_ATAQUE_MAX));
 
+            if (ApocalipsisZombi2025.isApagada() || !humano.estaVivo()) return true;
             if (ataqueExitoso) {
                 zombi.incrementarMuertes();
                 humano.setVivo(false);
@@ -80,29 +79,28 @@ public class Exterior {
                 LoggerApocalipsis.registrarAtaqueZombi(zombi.getID(), humano.getID(), false);
             }
         } finally {
-            humano.setSiendoAtacado(false);
-            zombis.remove(zombi);
-            LoggerApocalipsis.registroZombi(zombi.getID(), "Salió de Zona " + idZona);
+            synchronized (lockHumanos) {
+                humano.setSiendoAtacado(false);
+                lockHumanos.notifyAll();
+            }
         }
-        esperaConPausa(Config.randTiempo(Config.TIEMPO_ESPERA_ZOMBI_MIN, Config.TIEMPO_ESPERA_ZOMBI_MAX));
+        return true;
     }
 
     // ===== MÉTODOS DE APOYO =====
     private void esperaConPausa(long tiempoMs) throws InterruptedException {
         long restante = tiempoMs;
-        while (restante > 0 && !Thread.interrupted()) {
-            if (ApocalipsisZombi2025.isSimulacionPausada()) {
-                synchronized (ApocalipsisZombi2025.class) {
-                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
-                        ApocalipsisZombi2025.class.wait();
-                    }
-                }
-            }
+        while (restante > 0) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            ApocalipsisZombi2025.esperarReanudacion();
             long dormir = Math.min(500, restante);
             Thread.sleep(dormir);
             restante -= dormir;
         }
     }
+
+    public void registrarZombi(Zombi zombi) { zombis.add(zombi); }
+    public void retirarZombi(Zombi zombi) { zombis.remove(zombi); }
 
     // ===== GETTERS Y CONSULTAS =====
 

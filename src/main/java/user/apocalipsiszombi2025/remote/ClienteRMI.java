@@ -16,7 +16,11 @@ import user.apocalipsiszombi2025.util.Config;
  * @author matin
  */
 public class ClienteRMI extends javax.swing.JFrame {
-    private ServicioApocalipsis servicio;
+    private volatile ServicioApocalipsis servicio;
+    private boolean actualizando;
+    private final java.util.concurrent.ExecutorService llamadas = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+        Thread hilo = new Thread(r, "Cliente-RMI"); hilo.setDaemon(true); return hilo;
+    });
     private boolean pausado = false;
     private javax.swing.Timer timerActualizacion;
     
@@ -26,7 +30,14 @@ public class ClienteRMI extends javax.swing.JFrame {
     public ClienteRMI(String host) {
         initComponents();
         setLocationRelativeTo(null);
-        conectar(host);
+        setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override public void windowClosed(java.awt.event.WindowEvent e) {
+                timerActualizacion.stop();
+                llamadas.shutdownNow();
+            }
+        });
+        llamadas.submit(() -> conectar(host));
         configurarTimer();
         timerActualizacion.start();
     }
@@ -87,9 +98,9 @@ public class ClienteRMI extends javax.swing.JFrame {
         try {
             Registry registry = LocateRegistry.getRegistry(host, Config.PUERTO_RMI);
             servicio = (ServicioApocalipsis) registry.lookup(Config.NOMBRE_SERVICIO);
-            areaEstado.append("Conectado a servidor RMI en " + host + "\n");
+            SwingUtilities.invokeLater(() -> areaEstado.append("Conectado a servidor RMI en " + host + "\n"));
         } catch (Exception e) {
-            areaEstado.append("Error conectando a servidor RMI: " + e.getMessage() + "\n");
+            SwingUtilities.invokeLater(() -> areaEstado.append("Error conectando a servidor RMI: " + e.getMessage() + "\n"));
         }
     }
 
@@ -98,7 +109,9 @@ public class ClienteRMI extends javax.swing.JFrame {
     }
 
     private void actualizarDatos() {
-        if (servicio == null || pausado) return;
+        if (servicio == null || pausado || actualizando) return;
+        actualizando = true;
+        llamadas.submit(() -> {
         
         try {
             int humanosRefugio = servicio.getNumHumanosRefugio();
@@ -122,32 +135,41 @@ public class ClienteRMI extends javax.swing.JFrame {
             for (String z : topZombis) sb.append("  ").append(z).append("\n");
 
             SwingUtilities.invokeLater(() -> {
+                actualizando = false;
                 areaEstado.setText(sb.toString());
                 areaEstado.setCaretPosition(0);
             });
         } catch (Exception e) {
             SwingUtilities.invokeLater(() -> {
+                actualizando = false;
                 areaEstado.setText("Error actualizando datos: " + e.getMessage());
             });
         }
+        });
     }
 
     private void togglePausa() {
         if (servicio == null) return;
         
-        try {
-            if (pausado) {
-                servicio.reanudarSimulacion();
-                timerActualizacion.start(); // Corregido: usar timerActualizacion
-            } else {
-                servicio.pausarSimulacion();
-                timerActualizacion.stop(); // Corregido: usar timerActualizacion
+        boolean reanudar = pausado;
+        btnPausar.setEnabled(false);
+        llamadas.submit(() -> {
+            try {
+                if (reanudar) servicio.reanudarSimulacion();
+                else servicio.pausarSimulacion();
+                SwingUtilities.invokeLater(() -> {
+                    pausado = !reanudar;
+                    if (pausado) timerActualizacion.stop(); else timerActualizacion.start();
+                    btnPausar.setText(pausado ? "Reanudar" : "Pausar");
+                    btnPausar.setEnabled(true);
+                });
+            } catch (Exception e) {
+                SwingUtilities.invokeLater(() -> {
+                    btnPausar.setEnabled(true);
+                    JOptionPane.showMessageDialog(this, "Error al pausar/reanudar: " + e.getMessage());
+                });
             }
-            pausado = !pausado;
-            btnPausar.setText(pausado ? "Reanudar" : "Pausar");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error al pausar/reanudar: " + e.getMessage());
-        }
+        });
     }
 
     /**

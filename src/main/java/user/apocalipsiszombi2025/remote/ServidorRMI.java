@@ -12,10 +12,19 @@ import user.apocalipsiszombi2025.util.LoggerApocalipsis;
  * @author matin
  */
 public class ServidorRMI {
+    private static Registry registry;
+    private static ServicioApocalipsisImpl servicio;
+    public static void detenerServicio() {
+        try { if (servicio != null) java.rmi.server.UnicastRemoteObject.unexportObject(servicio, true); }
+        catch (java.rmi.NoSuchObjectException e) { LoggerApocalipsis.registrarError("Cerrar servicio RMI", e); }
+        try { if (registry != null) java.rmi.server.UnicastRemoteObject.unexportObject(registry, true); }
+        catch (java.rmi.NoSuchObjectException e) { LoggerApocalipsis.registrarError("Cerrar registro RMI", e); }
+    }
+
     public static void iniciarServicio() {
         try {
-            ServicioApocalipsisImpl servicio = new ServicioApocalipsisImpl();
-            Registry registry = LocateRegistry.createRegistry(Config.PUERTO_RMI);
+            servicio = new ServicioApocalipsisImpl();
+            registry = LocateRegistry.createRegistry(Config.PUERTO_RMI);
             registry.rebind(Config.NOMBRE_SERVICIO, servicio);
             LoggerApocalipsis.registroSistema("Servicio RMI iniciado en puerto " + Config.PUERTO_RMI);
         } catch (Exception e) {

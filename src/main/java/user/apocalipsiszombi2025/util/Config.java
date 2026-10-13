@@ -60,7 +60,8 @@ public final class Config {
 
     /** Devuelve el id de zombi correspondiente a un id de humano */
     public static String humanoAIdZombi(String idHumano) {
-        return idHumano.replace('H', 'Z');
+        if (!idHumano.startsWith("H")) throw new IllegalArgumentException("ID humano inválido: " + idHumano);
+        return String.format(FORMATO_ID_ZOMBI, Integer.parseInt(idHumano.substring(1)));
     }
 
     private Config() {} // Evitar instanciación

@@ -22,7 +22,7 @@ public class Tunel {
     private final CyclicBarrier barreraGrupo = new CyclicBarrier(Config.TAMANO_GRUPO, this::notificarGrupoFormado);
     private final Set<Humano> grupoActual = ConcurrentHashMap.newKeySet();
     private final InterfazManager interfazManager;
-    private final Semaphore semPrioridadEntrada = new Semaphore(1, true);
+    private final java.util.concurrent.atomic.AtomicInteger esperandoEntrada = new java.util.concurrent.atomic.AtomicInteger();
     private volatile boolean tunelOcupado = false;
 
     public Tunel(int idTunel, InterfazManager interfazManager) {
@@ -38,10 +38,10 @@ public class Tunel {
 
         try {
             barreraGrupo.await();
-            lockTunel.lock();
+            lockTunel.lockInterruptibly();
             try {
                 // Espera si hay alguien con prioridad o el túnel está ocupado
-                while (tunelOcupado || semPrioridadEntrada.hasQueuedThreads()) {
+                while (tunelOcupado || esperandoEntrada.get() > 0) {
                     puedePasar.await();
                 }
                 tunelOcupado = true;
@@ -51,13 +51,13 @@ public class Tunel {
                 esperaConPausa(Config.TIEMPO_CRUCE_TUNEL);
             } finally {
                 tunelOcupado = false;
-                puedePasar.signal();
+                puedePasar.signalAll();
                 lockTunel.unlock();
             }
         } catch (BrokenBarrierException e) {
-            grupoActual.remove(h);
-            barreraGrupo.reset();
             throw new InterruptedException("Salida en grupo interrumpida");
+        } finally {
+            grupoActual.remove(h);
         }
     }
 
@@ -66,9 +66,9 @@ public class Tunel {
         LoggerApocalipsis.registroHumano(h.getID(),"Intenta regresar al refugio por Túnel " + idTunel);
         interfazManager.moverHumanoASalida(h.getID(), idTunel);
         
-        semPrioridadEntrada.acquire();
+        esperandoEntrada.incrementAndGet();
         try {
-            lockTunel.lock();
+            lockTunel.lockInterruptibly();
             try {
                 while (tunelOcupado) {
                     puedePasar.await();
@@ -83,11 +83,13 @@ public class Tunel {
                 interfazManager.moverHumanoAZonaDescanso(h.getID());
             } finally {
                 tunelOcupado = false;
-                puedePasar.signal();
+                puedePasar.signalAll();
                 lockTunel.unlock();
             }
         } finally {
-            semPrioridadEntrada.release();
+            esperandoEntrada.decrementAndGet();
+            lockTunel.lock();
+            try { puedePasar.signalAll(); } finally { lockTunel.unlock(); }
         }
     }
 
@@ -103,14 +105,9 @@ public class Tunel {
     // ===== MÉTODO DE ESPERA CON PAUSA =====
     private void esperaConPausa(long ms) throws InterruptedException {
         long restante = ms;
-        while (restante > 0 && !Thread.interrupted()) {
-            if (ApocalipsisZombi2025.isSimulacionPausada()) {
-                synchronized (ApocalipsisZombi2025.class) {
-                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
-                        ApocalipsisZombi2025.class.wait();
-                    }
-                }
-            }
+        while (restante > 0) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            ApocalipsisZombi2025.esperarReanudacion();
             Thread.sleep(Math.min(500, restante));
             restante -= 500;
         }
@@ -118,6 +115,6 @@ public class Tunel {
 
     // ===== MÉTODOS AUXILIARES =====
     public int getID() { return idTunel; }
-    public int getHumanosEsperandoEntrada() { return semPrioridadEntrada.getQueueLength(); }
+    public int getHumanosEsperandoEntrada() { return esperandoEntrada.get(); }
     public int getHumanosFormandoGrupo() { return barreraGrupo.getNumberWaiting(); }
 }

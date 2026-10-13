@@ -21,6 +21,7 @@ public class InterfazManager {
     private final Map<Integer, AtomicInteger> contadoresZonasHumanos = new ConcurrentHashMap<>();
     private final Map<Integer, AtomicInteger> contadoresZonasZombis = new ConcurrentHashMap<>();
     private final JLabel comidaLabel;
+    private final Map<String, String> ubicaciones = new ConcurrentHashMap<>();
     private final Object contadorLock = new Object();
 
     public InterfazManager(PantallaPrincipal gui) {
@@ -36,12 +37,22 @@ public class InterfazManager {
 
     // ======== REGISTRO DE ENTIDADES =========
     public synchronized void registrarHumano(String id) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> registrarHumano(id));
+            return;
+        }
+        if (entidades.containsKey(id)) return;
         JLabel label = crearEtiqueta(id, new Color(173, 216, 230));
         entidades.put(id, label);
         moverHumanoAZonaComun(id);
     }
 
     public synchronized void registrarZombi(String id, int zona) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> registrarZombi(id, zona));
+            return;
+        }
+        if (entidades.containsKey(id)) return;
         JLabel label = crearEtiqueta(id, new Color(220, 20, 60));
         entidades.put(id, label);
         moverZombiAZonaExterior(id, zona); // Aquí ya se actualiza el contador
@@ -79,18 +90,15 @@ public class InterfazManager {
     }
 
     public void moverHumanoAZonaExterior(String id, int zona) {
-        actualizarContadorHumanos(zona, 1);
         moverEntidad(id, "zonaExteriorHumano" + zona);
     }
 
     public void moverHumanoASalida(String id, int zona) {
-        actualizarContadorHumanos(zona, -1);
         moverEntidad(id, "salida" + zona);
     }
 
     // ======== MOVIMIENTO DE ZOMBIS =========
     public void moverZombiAZonaExterior(String id, int zona) {
-        actualizarContadorZombis(zona, 1);
         moverEntidad(id, "zonaExteriorZombi" + zona);
     }
 
@@ -105,6 +113,10 @@ public class InterfazManager {
 
     // ======== MÉTODOS DE APOYO =========
     private void moverEntidad(String id, String nombrePanelDestino) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> moverEntidad(id, nombrePanelDestino));
+            return;
+        }
         JLabel label = entidades.get(id);
         if (label == null) return;
 
@@ -114,6 +126,7 @@ public class InterfazManager {
             return;
         }
 
+        cambiarUbicacion(id, nombrePanelDestino);
         Container parent = label.getParent();
         if (parent != null) {
             parent.remove(label);
@@ -126,6 +139,21 @@ public class InterfazManager {
         if (parent != null && parent != destino) {
             parent.revalidate();
             parent.repaint();
+        }
+    }
+
+    private void cambiarUbicacion(String id, String destino) {
+        String anterior = destino == null ? ubicaciones.remove(id) : ubicaciones.put(id, destino);
+        if (java.util.Objects.equals(anterior, destino)) return;
+        contarUbicacion(anterior, -1);
+        contarUbicacion(destino, 1);
+    }
+
+    private void contarUbicacion(String ubicacion, int delta) {
+        if (ubicacion == null) return;
+        for (int zona = 0; zona < Config.NUM_ZONAS; zona++) {
+            if (ubicacion.equals("zonaExteriorHumano" + zona)) actualizarContadorHumanos(zona, delta);
+            if (ubicacion.equals("zonaExteriorZombi" + zona)) actualizarContadorZombis(zona, delta);
         }
     }
 
@@ -173,6 +201,11 @@ public class InterfazManager {
 
     // ========= ELIMINACIÓN =========
     public void eliminarEntidad(String id) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> eliminarEntidad(id));
+            return;
+        }
+        cambiarUbicacion(id, null);
         JLabel label = entidades.remove(id);
         if (label != null) {
             Container parent = label.getParent();

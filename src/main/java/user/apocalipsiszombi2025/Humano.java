@@ -43,7 +43,7 @@ public class Humano extends Thread {
             while (estaVivo()) {
                 if (!simulacionPausada()) {
                     cicloExploracion();
-                    cicloRefugio();
+                    if (estaVivo()) cicloRefugio();
                 } else {
                     esperarReanudacion();
                 }
@@ -51,7 +51,8 @@ public class Humano extends Thread {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
-            if (!estaVivo()) {
+            refugio.salirRefugio(this);
+            if (!estaVivo() && !ApocalipsisZombi2025.isApagada()) {
                 convertirEnZombi(zonaActualID);
             }
         }
@@ -63,17 +64,15 @@ public class Humano extends Thread {
 
         Tunel tunel = seleccionarTunel();
         Exterior zona = zonas[tunel.getID()];
+        refugio.salirRefugio(this);
         tunel.salirEnGrupo(this);
 
-        try {
-            zona.explorar(this);
-            zonaActualID = zona.getID();
-        } finally {
-            tunel.entrarRefugio(this);
-            if (!estaHerido()) {
-                refugio.reponerComida(Config.COMIDA_RECOLECTADA);
-            }
-        }
+        zonaActualID = zona.getID();
+        zona.explorar(this);
+        if (!estaVivo()) return;
+        tunel.entrarRefugio(this);
+        refugio.registrarEntrada(this);
+        if (!estaHerido()) refugio.reponerComida(Config.COMIDA_RECOLECTADA);
     }
 
     // ===== CICLO EN EL REFUGIO =====
@@ -89,7 +88,7 @@ public class Humano extends Thread {
 
     private void convertirEnZombi(int idZona) {
         try {
-            String idZombi = idHumano.replace('H', 'Z');
+            String idZombi = Config.humanoAIdZombi(idHumano);
             Zombi nuevoZombi = new Zombi(idZombi, zonas, interfazManager, idZona);
 
             // Primero registrar el zombi antes de eliminar al humano
@@ -98,10 +97,9 @@ public class Humano extends Thread {
             // Luego eliminar al humano de la interfaz
             interfazManager.eliminarEntidad(idHumano);
 
-            // Finalmente iniciar el nuevo zombi
-            nuevoZombi.start();
+            // agregarZombi inicia el hilo bajo el control de apagado.
             LoggerApocalipsis.registroZombi(idZombi, "Creado desde " + idHumano);
-        } catch (Exception e) {}
+        } catch (Exception e) { LoggerApocalipsis.registrarError("Conversión de " + idHumano, e); }
     }
 
     // ===== MÉTODOS AUXILIARES =====
@@ -114,11 +112,7 @@ public class Humano extends Thread {
     }
 
     private void esperarReanudacion() throws InterruptedException {
-        synchronized (ApocalipsisZombi2025.class) {
-            while (simulacionPausada()) {
-                ApocalipsisZombi2025.class.wait();
-            }
-        }
+        ApocalipsisZombi2025.esperarReanudacion();
     }
 
     // ===== GETTERS & SETTERS SINCRONIZADOS =====

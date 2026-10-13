@@ -26,6 +26,8 @@ public class ApocalipsisZombi2025 {
     private static Refugio refugio;
     private static Tunel[] tuneles;
     private static Exterior[] zonas;
+    private static volatile boolean apagada;
+    private static Thread creadorHumanos;
     private static final Random rand = new Random();
 
     // === Control de pausa ===
@@ -39,22 +41,23 @@ public class ApocalipsisZombi2025 {
             ServidorRMI.iniciarServicio(); // Arranca el servicio remoto
             lanzarEntidades();
             // Si quieres que el cliente remoto se lance automáticamente en la misma máquina:
-            ClienteRMI cliente = new ClienteRMI("localhost");
-            cliente.setVisible(true);  
+            javax.swing.SwingUtilities.invokeLater(() -> new ClienteRMI("localhost").setVisible(true));
         } catch (Exception e) {
             LoggerApocalipsis.registroSistema("Error en la simulación: " + e.getMessage());
             apagarSimulacion();
         }
     }
 
-    private static void inicializarSimulacion() {
+    private static void inicializarSimulacion() throws Exception {
         LoggerApocalipsis.registroSistema("==== INICIO SIMULACIÓN ====");
         Runtime.getRuntime().addShutdownHook(new Thread(ApocalipsisZombi2025::apagarSimulacion));
 
         // Inicializar GUI
-        PantallaPrincipal gui = new PantallaPrincipal();
-        gui.setVisible(true);
-        interfazManager = new InterfazManager(gui);
+        javax.swing.SwingUtilities.invokeAndWait(() -> {
+            PantallaPrincipal gui = new PantallaPrincipal();
+            interfazManager = new InterfazManager(gui);
+            gui.setVisible(true);
+        });
 
         // Inicializar mundo
         refugio = new Refugio(interfazManager);
@@ -76,13 +79,19 @@ public class ApocalipsisZombi2025 {
         LoggerApocalipsis.registroZombi(Config.ID_PACIENTE_CERO, "Liberado como paciente cero");
 
         // Lanzar humanos escalonadamente
-        new Thread(() -> {
+        creadorHumanos = new Thread(() -> {
             for (int i = 1; i <= Config.NUM_HUMANOS; i++) {
-                while (isSimulacionPausada()) esperarReanudacion();
-                String id = String.format(Config.FORMATO_ID_HUMANO, i);
-                Humano humano = new Humano(id, tuneles, refugio, zonas, interfazManager);
-                humanos.add(humano);
-                humano.start();
+                try { esperarReanudacion(); } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                synchronized (ApocalipsisZombi2025.class) {
+                    if (apagada) break;
+                    String id = String.format(Config.FORMATO_ID_HUMANO, i);
+                    Humano humano = new Humano(id, tuneles, refugio, zonas, interfazManager);
+                    humanos.add(humano);
+                    humano.start();
+                }
                 try {
                     Thread.sleep(Config.randTiempo(Config.INTERVALO_CREACION_MIN, Config.INTERVALO_CREACION_MAX));
                 } catch (InterruptedException e) {
@@ -90,7 +99,8 @@ public class ApocalipsisZombi2025 {
                     break;
                 }
             }
-        }).start();
+        }, "Creador-humanos");
+        creadorHumanos.start();
     }
 
     // ==== Métodos de control de simulación ====
@@ -119,39 +129,53 @@ public class ApocalipsisZombi2025 {
         return simulacionPausada.get();
     }
 
-    private static void esperarReanudacion() {
-        pausaLock.lock();
+    public static void esperarReanudacion() throws InterruptedException {
+        pausaLock.lockInterruptibly();
         try {
-            while (simulacionPausada.get()) {
-                pausaCondition.await();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            while (simulacionPausada.get() && !apagada) pausaCondition.await();
+            if (apagada) throw new InterruptedException("Simulación apagada");
         } finally {
             pausaLock.unlock();
         }
     }
 
-    public static synchronized void agregarZombi(Zombi zombi) {
-        zombis.add(zombi);
+    public static boolean isApagada() { return apagada; }
 
-        // Asegurarse que el contador existe antes de registrar
-        if (interfazManager != null) {
-            interfazManager.registrarZombi(zombi.getID(), zombi.getZonaActual());
-        }
+    public static synchronized void agregarZombi(Zombi zombi) {
+        if (apagada) return;
+        zombis.add(zombi);
+        zombi.start();
+
+
     }
 
-    public static synchronized void apagarSimulacion() {
+    public static void apagarSimulacion() {
+        synchronized (ApocalipsisZombi2025.class) {
+            if (apagada) return;
+            apagada = true;
+        }
+        pausaLock.lock();
+        try { simulacionPausada.set(false); pausaCondition.signalAll(); }
+        finally { pausaLock.unlock(); }
+        if (creadorHumanos != null) creadorHumanos.interrupt();
+        zombis.forEach(Zombi::detener);
+        humanos.forEach(Thread::interrupt);
+        for (Thread hilo : humanos) esperarFin(hilo);
+        for (Thread hilo : zombis) esperarFin(hilo);
+        if (creadorHumanos != null) esperarFin(creadorHumanos);
+        if (interfazManager != null) {
+            zombis.forEach(z -> interfazManager.eliminarEntidad(z.getID()));
+            humanos.forEach(h -> interfazManager.eliminarEntidad(h.getID()));
+        }
+        ServidorRMI.detenerServicio();
         LoggerApocalipsis.registroSistema("==== APAGANDO SIMULACIÓN ====");
-        zombis.forEach(z -> {
-            z.detener();
-            interfazManager.eliminarEntidad(z.getID());
-        });
-        humanos.forEach(h -> {
-            h.setVivo(false);
-            interfazManager.eliminarEntidad(h.getID());
-        });
         LoggerApocalipsis.apagar();
+    }
+
+    private static void esperarFin(Thread hilo) {
+        if (hilo == Thread.currentThread()) return;
+        try { hilo.join(2000); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
     // ==== Métodos para RMI y estadísticas ====

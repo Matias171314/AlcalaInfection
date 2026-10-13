@@ -20,7 +20,8 @@ public class Zombi extends Thread {
     private final Random rand = new Random();
     private final InterfazManager interfazManager;
     private volatile boolean activo = true;
-    private int zonaActual;
+    private volatile int zonaActual;
+    private long tiempoSinVictimaRestante = nuevoPlazoCambio();
 
     public Zombi(String idZombi, Exterior[] zonas, InterfazManager interfazManager, int zonaInicial) {
         this.idZombi = idZombi;
@@ -33,6 +34,7 @@ public class Zombi extends Thread {
     @Override
     public void run() {
         try {
+            zonas[zonaActual].registrarZombi(this);
             interfazManager.registrarZombi(idZombi, zonaActual);
             while (activo && !isInterrupted()) {
                 if (!simulacionPausada()) {
@@ -44,31 +46,53 @@ public class Zombi extends Thread {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
+            zonas[zonaActual].retirarZombi(this);
+            interfazManager.eliminarEntidad(idZombi);
             LoggerApocalipsis.registroZombi(idZombi, "Dejó de patrullar");
         }
     }
 
     private void patrullarZona() throws InterruptedException {
-        // El zombi permanece en su zona actual (no cambia como en el código original)
-        Exterior zona = zonas[zonaActual];
+        ApocalipsisZombi2025.esperarReanudacion();
+        boolean encontroVictima = zonas[zonaActual].atacar(this);
+        long espera = Config.randTiempo(Config.TIEMPO_ESPERA_ZOMBI_MIN, Config.TIEMPO_ESPERA_ZOMBI_MAX);
+        if (encontroVictima) {
+            // Encontrar una víctima reinicia el plazo, aunque consiga defenderse.
+            tiempoSinVictimaRestante = nuevoPlazoCambio();
+            esperaConPausa(espera);
+            return;
+        }
+        espera = Math.min(espera, tiempoSinVictimaRestante);
+        esperaConPausa(espera);
+        tiempoSinVictimaRestante -= espera;
+        if (tiempoSinVictimaRestante <= 0) {
+            cambiarZona();
+            tiempoSinVictimaRestante = nuevoPlazoCambio();
+        }
+    }
 
-        // Realizar ataque en la zona actual
-        zona.atacar(this);
+    private long nuevoPlazoCambio() {
+        return Config.randTiempo(Config.TIEMPO_CAMBIO_ZONA_MIN, Config.TIEMPO_CAMBIO_ZONA_MAX);
+    }
 
-        // Tiempo de espera después de atacar (cooldown)
-        esperaConPausa(3000); // 3 segundos de cooldown
+    private void cambiarZona() throws InterruptedException {
+        ApocalipsisZombi2025.esperarReanudacion();
+        if (zonas.length < 2) return;
+        int anterior = zonaActual;
+        int siguiente = rand.nextInt(zonas.length - 1);
+        if (siguiente >= anterior) siguiente++;
+        zonas[anterior].retirarZombi(this);
+        zonaActual = siguiente;
+        zonas[siguiente].registrarZombi(this);
+        interfazManager.moverZombiAZonaExterior(idZombi, siguiente);
+        LoggerApocalipsis.registroZombi(idZombi, "Cambió de Zona " + anterior + " a " + siguiente + " por falta de víctimas");
     }
 
     private void esperaConPausa(long tiempoMs) throws InterruptedException {
         long restante = tiempoMs;
-        while (restante > 0 && !Thread.interrupted()) {
-            if (ApocalipsisZombi2025.isSimulacionPausada()) {
-                synchronized (ApocalipsisZombi2025.class) {
-                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
-                        ApocalipsisZombi2025.class.wait();
-                    }
-                }
-            }
+        while (restante > 0) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            ApocalipsisZombi2025.esperarReanudacion();
             long dormir = Math.min(500, restante);
             Thread.sleep(dormir);
             restante -= dormir;
@@ -84,11 +108,7 @@ public class Zombi extends Thread {
     }
 
     private void esperarReanudacion() throws InterruptedException {
-        synchronized (ApocalipsisZombi2025.class) {
-            while (simulacionPausada()) {
-                ApocalipsisZombi2025.class.wait();
-            }
-        }
+        ApocalipsisZombi2025.esperarReanudacion();
     }
 
     public void detener() {

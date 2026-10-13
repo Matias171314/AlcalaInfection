@@ -16,7 +16,7 @@ import java.util.concurrent.Semaphore;
  */
 public class Refugio {
     private final AtomicInteger comidaDisponible = new AtomicInteger(Config.COMIDA_INICIAL);
-    private final AtomicInteger humanosEnRefugio = new AtomicInteger(0);
+    private final java.util.Set<Humano> humanosEnRefugio = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Lock lockComida = new ReentrantLock(true);
     private final Condition hayComida = lockComida.newCondition();
     private final Semaphore comedor = new Semaphore(Config.PLAZAS_COMEDOR, true);
@@ -28,7 +28,7 @@ public class Refugio {
 
     // ===== ZONA COMÚN =====
     public void entrarZonaComun(Humano humano) throws InterruptedException {
-        humanosEnRefugio.incrementAndGet();
+        registrarEntrada(humano);
         interfazManager.moverHumanoAZonaComun(humano.getID());
         LoggerApocalipsis.registroHumano(humano.getID(), "Entró en Zona Común");
         esperaConPausa(Config.randTiempo(Config.TIEMPO_PREPARACION_MIN, Config.TIEMPO_PREPARACION_MAX));
@@ -57,11 +57,12 @@ public class Refugio {
                     comidaDisponible.decrementAndGet();
                     interfazManager.actualizarComida(comidaDisponible.get());
                     LoggerApocalipsis.registroHumano(humano.getID(), "Está comiendo. Queda: " + comidaDisponible.get());
-                    esperaConPausa(Config.randTiempo(Config.TIEMPO_COMER_MIN, Config.TIEMPO_COMER_MAX));
+
                 }
             } finally {
                 lockComida.unlock();
             }
+            esperaConPausa(Config.randTiempo(Config.TIEMPO_COMER_MIN, Config.TIEMPO_COMER_MAX));
             LoggerApocalipsis.registroHumano(humano.getID(), "Terminó de comer");
         } finally {
             comedor.release();
@@ -84,22 +85,20 @@ public class Refugio {
     // ===== MÉTODO AUXILIAR DE PAUSA =====
     private void esperaConPausa(long tiempoMs) throws InterruptedException {
         long restante = tiempoMs;
-        while (restante > 0 && !Thread.interrupted()) {
-            if (ApocalipsisZombi2025.isSimulacionPausada()) {
-                synchronized (ApocalipsisZombi2025.class) {
-                    while (ApocalipsisZombi2025.isSimulacionPausada()) {
-                        ApocalipsisZombi2025.class.wait();
-                    }
-                }
-            }
+        while (restante > 0) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            ApocalipsisZombi2025.esperarReanudacion();
             long dormir = Math.min(500, restante);
             Thread.sleep(dormir);
             restante -= dormir;
         }
     }
 
+    public void registrarEntrada(Humano humano) { humanosEnRefugio.add(humano); }
+    public void salirRefugio(Humano humano) { humanosEnRefugio.remove(humano); }
+
     // ===== ESTADÍSTICAS =====
     public int getHumanosEnRefugio() {
-        return humanosEnRefugio.get();
+        return humanosEnRefugio.size();
     }
 }
